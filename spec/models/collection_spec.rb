@@ -210,4 +210,11 @@ RSpec.describe Collection, type: :model do
     it { is_expected.to delegate_method(:assigns_workflow?).to(:collection_type) }
     it { is_expected.to delegate_method(:assigns_visibility?).to(:collection_type) }
   end
+
+  describe '#update_nested_collection_relationship_indices', :with_nested_reindexing do
+    it 'will be called after save' do
+      expect(Samvera::NestingIndexer).to receive(:reindex_relationships).with(id: kind_of(String))
+      collection.save!
+    end
+  end
 end

@@ -149,6 +149,7 @@ RSpec/MessageSpies:
 RSpec/InstanceVariable:
   Exclude:
     - 'spec/services/hyrax/derivative_service_spec.rb'
+    - 'spec/models/concerns/hyrax/collection_nesting_spec.rb'
 
 RSpec/ExpectActual:
   Enabled: false
