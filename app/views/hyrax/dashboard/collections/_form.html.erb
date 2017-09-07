@@ -95,7 +95,7 @@
         <% else %>
           <%= f.submit t(:'hyrax.collection.select_form.update'), class: 'btn btn-primary', onclick: "confirmation_needed = false;", id: "update_submit", name: "update_collection" %>
         <% end %>
-        <%= link_to t(:'helpers.action.cancel'), main_app.root_path, class: 'btn btn-link' %>
+        <%= link_to t(:'helpers.action.cancel'), hyrax.my_collections_path, class: 'btn btn-link' %>
       </div>
     </div> <!-- end tab-content -->
   <% end # simple_form_for %>

@@ -15,5 +15,23 @@ export default class {
 
         let visibilityTab = new Visibility(elem.find('#visibility'));
         visibilityTab.setup();
+        this.form = elem.find('form.edit_admin_set')
+        this.refererAnchor = this.addRefererAnchor()
+        this.watchActiveTab()
+        this.setRefererAnchor($('.nav-tabs li.active a').attr('href'))
+    }
+
+    addRefererAnchor() {
+        let referer_anchor_input = $('<input>').attr({type: 'hidden', id: 'referer_anchor', name: 'referer_anchor'}) 
+        this.form.append(referer_anchor_input)
+        return referer_anchor_input
+    }
+
+    setRefererAnchor(id) {
+        this.refererAnchor.val(id)
+    }
+
+    watchActiveTab() {
+        $('.nav-tabs a').on('shown.bs.tab', (e) => this.setRefererAnchor($(e.target).attr('href')))
     }
 }
