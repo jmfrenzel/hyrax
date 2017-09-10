@@ -3,6 +3,7 @@ import { ChecklistItem } from './checklist_item'
 import { UploadedFiles } from './uploaded_files'
 import { DepositAgreement } from './deposit_agreement'
 import VisibilityComponent from './visibility_component'
+import tabifyForm from 'hyrax/tabbed_form'
 
 /**
  * Polyfill String.prototype.startsWith()
@@ -92,23 +93,7 @@ export default class SaveWorkControl {
     this.preventSubmit()
     this.watchMultivaluedFields()
     this.formChanged()
-    this.refererAnchor = this.addRefererAnchor()
-    this.watchActiveTab()
-    this.setRefererAnchor($('.nav-tabs li.active a').attr('href'))
-  }
-
-  addRefererAnchor() {
-    let referer_anchor_input = $('<input>').attr({type: 'hidden', id: 'referer_anchor', name: 'referer_anchor'}) 
-    this.form.append(referer_anchor_input)
-    return referer_anchor_input
-  }
-
-  setRefererAnchor(id) {
-    this.refererAnchor.val(id)
-  }
-
-  watchActiveTab() {
-    $('.nav-tabs a').on('shown.bs.tab', (e) => this.setRefererAnchor($(e.target).attr('href')))
+    tabifyForm(this.form)
   }
 
   preventSubmit() {

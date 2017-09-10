@@ -267,8 +267,8 @@ module Hyrax
       end
 
       def update_referer
-        if params['referer_anchor'].present?
-          edit_polymorphic_path([main_app, curation_concern]) + params['referer_anchor']
+        if params[:referer_anchor]
+          edit_polymorphic_path([main_app, curation_concern]) + params[:referer_anchor]
         else
           polymorphic_path([main_app, curation_concern])
         end
