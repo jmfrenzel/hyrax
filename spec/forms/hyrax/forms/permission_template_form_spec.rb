@@ -88,7 +88,7 @@ RSpec.describe Hyrax::Forms::PermissionTemplateForm do
                                           access: "manage").permit!]
       end
 
-      it "also adds edit_access to the AdminSet itself" do
+      it "also adds edit_access to the AdminSet" do
         expect { subject }.to change { permission_template.access_grants.count }.by(1)
         expect(admin_set.reload.edit_groups).to match_array ['bob', 'archivists']
       end
@@ -101,7 +101,7 @@ RSpec.describe Hyrax::Forms::PermissionTemplateForm do
                                           access: "view").permit!]
       end
 
-      it "doesn't adds edit_access to the AdminSet itself" do
+      it "doesn't adds edit_access to the AdminSet" do
         expect { subject }.to change { permission_template.access_grants.count }.by(1)
         expect(admin_set.reload.edit_users).to match_array [user.user_key] # MANAGE user added in before do
       end
