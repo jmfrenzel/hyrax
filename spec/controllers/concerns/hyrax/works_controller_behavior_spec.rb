@@ -172,4 +172,10 @@ RSpec.describe Hyrax::WorksControllerBehavior, :clean_repo, type: :controller do
       it_behaves_like 'allows show access'
     end
   end
+
+  describe '#manifest' do
+    include_context 'with a logged in user'
+
+    it 'resolves json'
+  end
 end

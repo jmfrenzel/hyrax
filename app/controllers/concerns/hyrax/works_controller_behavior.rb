@@ -10,10 +10,11 @@ module Hyrax
       with_themed_layout :decide_layout
       copy_blacklight_config_from(::CatalogController)
 
-      class_attribute :_curation_concern_type, :show_presenter, :work_form_service, :search_builder_class
+      class_attribute :_curation_concern_type, :show_presenter, :work_form_service, :search_builder_class, :iiif_manifest_builder
       self.show_presenter = Hyrax::WorkShowPresenter
       self.work_form_service = Hyrax::WorkFormService
       self.search_builder_class = WorkSearchBuilder
+      self.iiif_manifest_builder = (Flipflop.cache_work_iiif_manifest? ? Hyrax::CachingIiifManifestBuilder.new : Hyrax::ManifestBuilderService.new)
       attr_accessor :curation_concern
       helper_method :curation_concern, :contextual_path
 
@@ -127,7 +128,7 @@ module Hyrax
     def manifest
       headers['Access-Control-Allow-Origin'] = '*'
 
-      json = sanitize_manifest(JSON.parse(manifest_builder.to_h.to_json))
+      json = iiif_manifest_builder.manifest_for(presenter: presenter)
 
       respond_to do |wants|
         wants.json { render json: json }
@@ -136,6 +137,10 @@ module Hyrax
     end
 
     private
+
+      def iiif_manifest_builder
+        self.class.iiif_manifest_builder
+      end
 
       def user_collections
         collections_service.search_results(:deposit)
@@ -157,10 +162,6 @@ module Hyrax
 
       def build_form
         @form = work_form_service.build(curation_concern, current_ability, self)
-      end
-
-      def manifest_builder
-        ::IIIFManifest::ManifestFactory.new(presenter)
       end
 
       def actor
@@ -325,22 +326,6 @@ module Hyrax
 
       def permissions_changed?
         @saved_permissions != curation_concern.permissions.map(&:to_hash)
-      end
-
-      def sanitize_manifest(hash)
-        hash['label'] = sanitize_value(hash['label']) if hash.key?('label')
-        hash['description'] = hash['description']&.collect { |elem| sanitize_value(elem) } if hash.key?('description')
-
-        hash['sequences']&.each do |sequence|
-          sequence['canvases']&.each do |canvas|
-            canvas['label'] = sanitize_value(canvas['label'])
-          end
-        end
-        hash
-      end
-
-      def sanitize_value(text)
-        Loofah.fragment(text.to_s).scrub!(:prune).to_s
       end
   end
 end
