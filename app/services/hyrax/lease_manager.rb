@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 module Hyrax
+  ##
+  # Provides utilities for managing the lifecycle of an `Hyrax::Lease` on a
+  # `Hyrax::Resource`.
   class LeaseManager
     ##
     # @!attribute [rw] resource
@@ -31,6 +34,12 @@ module Hyrax
       end
     end
 
+    ##
+    # Copies and applies the lease to a new (target) resource.
+    #
+    # @param target [Hyrax::Resource]
+    #
+    # @return [Boolean]
     def copy_lease_to(target:)
       return false unless under_lease?
 
@@ -47,9 +56,37 @@ module Hyrax
     end
 
     ##
-    # @return [Valkyrie::Resource]
+    # @return [void]
+    # @raise [NotEnforcableError] when trying to apply an lease that isn't active
+    def apply!
+      apply || raise(NotEnforcableError)
+    end
+
+    ##
+    # @return [Boolean]
+    def enforced?
+      lease.visibility_during_lease.to_s == resource.visibility
+    end
+
+    ##
+    # @return [Hyrax::Lease]
     def lease
       resource.lease || Lease.new
+    end
+
+    ##
+    # @return [Boolean]
+    def release
+      return false if under_lease?
+      return true if lease.visibility_after_lease.nil?
+
+      resource.visibility = lease.visibility_after_lease
+    end
+
+    ##
+    # @return [void]
+    def release!
+      release || raise(NotReleasableError)
     end
 
     ##
@@ -57,6 +94,9 @@ module Hyrax
     def under_lease?
       lease.active?
     end
+
+    class NotEnforcableError < RuntimeError; end
+    class NotReleasableError < RuntimeError; end
 
     private
 
