@@ -9,7 +9,7 @@ RSpec.describe Hyrax::Forms::ResourceForm do
 
     let(:form_class) do
       Class.new(Hyrax::Forms::ResourceForm(work.class)) do
-        self.required_fields = [:title]
+        property :depositor
       end
     end
 
@@ -145,26 +145,85 @@ RSpec.describe Hyrax::Forms::ResourceForm do
     end
   end
 
-  describe '#required?' do
-    it 'is false for non-required fields' do
-      expect(form.required?(:title)).to eq false
+  describe '#primary_terms' do
+    it 'lists the core metadata primary terms' do
+      expect(form.primary_terms).to contain_exactly(:title)
     end
 
-    context 'when some fields are required' do
+    context 'with custom primary terms' do
       subject(:form) { form_class.new(work) }
 
       let(:form_class) do
         Class.new(Hyrax::Forms::ResourceForm(work.class)) do
-          self.required_fields = [:title]
+          property :my_primary, virtual: true, primary: true
         end
       end
 
-      it 'is true for required fields' do
-        expect(form.required?(:title)).to eq true
+      it 'adds the custom primary terms' do
+        expect(form.primary_terms).to contain_exactly(:title, :my_primary)
+      end
+    end
+
+    context 'with basic metadata' do
+      subject(:form) { form_class.new(work) }
+
+      let(:work) { build(:monograph) }
+
+      let(:form_class) do
+        Class.new(Hyrax::Forms::ResourceForm(work.class)) do
+          include Hyrax::FormFields(:basic_metadata)
+        end
       end
 
-      it 'is false for non-required fields' do
-        expect(form.required?(:depositor)).to eq false
+      it 'adds the basic metadata primary terms' do
+        expect(form.primary_terms)
+          .to contain_exactly(:title, :creator, :rights_statement)
+      end
+    end
+  end
+
+  describe '#required?' do
+    subject(:form) { form_class.new(work) }
+
+    let(:form_class) do
+      Class.new(Hyrax::Forms::ResourceForm(work.class)) do
+        property :non_required, virtual: true
+      end
+    end
+
+    it 'is true for required fields' do
+      expect(form.required?(:title)).to eq true
+    end
+
+    it 'is false for non-required fields' do
+      expect(form.required?(:non_required)).to eq false
+    end
+  end
+
+  describe '#secondary_terms' do
+    it 'is empty with only core metadata' do
+      expect(form.secondary_terms)
+        .to be_empty
+    end
+
+    context 'with basic metadata' do
+      subject(:form) { form_class.new(work) }
+
+      let(:work) { build(:monograph) }
+
+      let(:form_class) do
+        Class.new(Hyrax::Forms::ResourceForm(work.class)) do
+          include Hyrax::FormFields(:basic_metadata)
+        end
+      end
+
+      it 'has secondary terms' do
+        expect(form.secondary_terms).to include(:description)
+      end
+
+      it 'does not have the primary terms' do
+        expect(form.secondary_terms)
+          .not_to include(:title, :creator, :rights_statement)
       end
     end
   end
