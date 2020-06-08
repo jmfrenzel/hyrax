@@ -16,6 +16,13 @@ module Hyrax
         self.model_class = work_class
 
         include Hyrax::FormFields(:core_metadata)
+
+        ##
+        # @return [String]
+        def self.inspect
+          return "Hyrax::Forms::ResourceForm(#{model_class})" unless name.present?
+          super
+        end
       end
     end
 
@@ -36,12 +43,34 @@ module Hyrax
         property :access, virtual: true, prepopulator: ->(_opts) { self.access = model.mode }
       end
 
+      ##
+      # @api private
+      #
+      # @note includes special handling for Wings, to support compatibility
+      #   with `etag`-driven, application-side lock checks. for non-wings adapters
+      #   we want to move away from application side lock validation and rely
+      #   on the adapter/database features instead.
+      LockKeyPopulator = lambda do |_options|
+        self.version =
+          case Hyrax.metadata_adapter
+          when Wings::Valkyrie::MetadataAdapter
+            model.persisted? ? Wings::ActiveFedoraConverter.convert(resource: model).etag : ''
+          else
+            Hyrax.logger.info 'trying to prepopulate a lock token for ' \
+                              "#{self.class.inspect}, but optimistic locking isn't " \
+                              "supported for the configured adapter: #{Hyrax.metadata_adapter.class}"
+            ''
+          end
+      end
+
       class_attribute :model_class
 
       delegate :depositor, :human_readable_type, to: :model
 
       property :visibility # visibility has an accessor on the model
 
+      property :date_modified, readable: false
+      property :date_uploaded, readable: false
       property :agreement_accepted, virtual: true, default: false, prepopulator: ->(_opts) { self.agreement_accepted = !model.new_record }
 
       collection :permissions, virtual: true, default: [], form: Permission, prepopulator: ->(_opts) { self.permissions = Hyrax::AccessControl.for(resource: model).permissions }
@@ -57,8 +86,18 @@ module Hyrax
 
       # pcdm relationships
       property :admin_set_id
-      property :member_ids, default: []
-      property :member_of_collection_ids, default: []
+      property :member_ids, default: [], type: Valkyrie::Types::Array
+      property :member_of_collection_ids, default: [], type: Valkyrie::Types::Array
+
+      # provide a lock token for optimistic locking; we name this `version` for
+      # backwards compatibility
+      #
+      # Hyrax handles lock token validation on the application side for legacy
+      # models and Wings so we provide a token even if optimistic locking on
+      # the model is disabled
+      #
+      # @see https://github.com/samvera/valkyrie/wiki/Optimistic-Locking
+      property :version, virtual: true, prepopulator: LockKeyPopulator
 
       # backs the child work search element;
       # @todo: look for a way for the view template not to depend on this

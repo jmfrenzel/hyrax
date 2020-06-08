@@ -116,6 +116,12 @@ RSpec.describe Hyrax::Forms::ResourceForm do
       expect(form.member_ids).to be_empty
     end
 
+    it 'casts to an array' do
+      expect { form.validate(member_ids: '123') }
+        .to change { form.member_ids }
+        .to contain_exactly('123')
+    end
+
     context 'when the object has members' do
       let(:work) { FactoryBot.build(:monograph, :with_member_works) }
 
@@ -238,6 +244,43 @@ RSpec.describe Hyrax::Forms::ResourceForm do
       it 'does not have the primary terms' do
         expect(form.secondary_terms)
           .not_to include(:title, :creator, :rights_statement)
+      end
+    end
+  end
+
+  describe '#version' do
+    context 'when using wings', valkyrie_adapter: :wings_adapter do
+      it 'prepopulates as empty before save' do
+        form.prepopulate!
+        expect(form.version).to eq ''
+      end
+
+      context 'with a saved work' do
+        let(:work) { FactoryBot.valkyrie_create(:hyrax_work) }
+
+        it 'prepopulates with the etag' do
+          af_object = Wings::ActiveFedoraConverter.convert(resource: work)
+
+          form.prepopulate!
+          expect(form.version).to eq af_object.etag
+        end
+      end
+    end
+
+    context 'when using a generic valkyrie adapter', valkyrie_adapter: :test_adapter do
+      it 'prepopulates as empty before save' do
+        form.prepopulate!
+        expect(form.version).to eq ''
+      end
+
+      context 'with a saved work' do
+        let(:work) { FactoryBot.valkyrie_create(:hyrax_work) }
+
+        it 'prepopulates empty' do
+          form.prepopulate!
+
+          expect(form.version).to eq ''
+        end
       end
     end
   end

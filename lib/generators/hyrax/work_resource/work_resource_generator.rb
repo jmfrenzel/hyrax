@@ -24,13 +24,28 @@ class Hyrax::WorkResourceGenerator < Rails::Generators::NamedBase
     template('controller.rb.erb', File.join('app/controllers/hyrax', class_path, "#{plural_file_name}_controller.rb"))
   end
 
+  def create_metadata_config
+    template('metadata.yaml', File.join('config/metadata/', "#{file_name}.yaml"))
+    return unless attributes.present?
+    gsub_file File.join('config/metadata/', "#{file_name}.yaml"),
+              'attributes: {}',
+              { 'attributes' => attributes.collect { |arg| [arg.name, { 'type' => arg.type.to_s }] }.to_h }.to_yaml
+  end
+
   def create_model
     template('work.rb.erb', File.join('app/models/', class_path, "#{file_name}.rb"))
   end
 
   def create_model_spec
-    template('work_spec.rb.erb', File.join('spec/models/', class_path, "#{file_name}_spec.rb")) if
-      rspec_installed?
+    return unless rspec_installed?
+    filepath = File.join('spec/models/', class_path, "#{file_name}_spec.rb")
+    template('work_spec.rb.erb', filepath)
+    return unless attributes.present?
+    inject_into_file filepath, after: /it_behaves_like 'a Hyrax::Work'\n/ do
+      "\n  context 'includes schema defined metadata' do\n"\
+      "#{attributes.collect { |arg| "    it { is_expected.to respond_to(:#{arg.name}) }\n" }.join}" \
+      "  end\n"
+    end
   end
 
   def create_form
@@ -56,17 +71,6 @@ class Hyrax::WorkResourceGenerator < Rails::Generators::NamedBase
 
   def create_indexer
     template('indexer.rb.erb', File.join('app/indexers/', class_path, "#{file_name}_indexer.rb"))
-  end
-
-  def register_indexer
-    config = 'config/initializers/hyrax.rb'
-    register_line = "Hyrax::ValkyrieIndexer.register #{class_name}Indexer, as_indexer_for: #{class_name}\n"
-
-    return if File.read(config).include?(register_line)
-
-    append_to_file config do
-      register_line
-    end
   end
 
   def create_views
