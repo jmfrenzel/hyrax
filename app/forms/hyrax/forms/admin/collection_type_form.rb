@@ -10,14 +10,24 @@ module Hyrax
         delegate :title, :description, :brandable, :discoverable, :nestable, :sharable, :share_applies_to_new_works,
                  :require_membership, :allow_multiple_membership, :assigns_workflow,
                  :assigns_visibility, :id, :collection_type_participants, :persisted?,
-                 :collections?, :admin_set?, :user_collection?, :badge_color, to: :collection_type
+                 :admin_set?, :user_collection?, :badge_color, to: :collection_type
 
+        ##
+        # @return [Boolean]
         def all_settings_disabled?
           collections? || admin_set? || user_collection?
         end
 
+        ##
+        # @return [Boolean]
         def share_options_disabled?
           all_settings_disabled? || !sharable
+        end
+
+        ##
+        # @return [Boolean]
+        def collections?
+          collection_type.collections.any?
         end
       end
     end
