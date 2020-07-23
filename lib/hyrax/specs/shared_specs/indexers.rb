@@ -1,9 +1,19 @@
 # frozen_string_literal: true
 
+# These shared specs test various aspects of valkyrie based indexers by calling the #to_solr method.
+# All tests require two variables to be set in the caller using let statements:
+#   * indexer_class - class of the indexer being tested
+#   * resource - a Hyrax::Resource that defines attributes and values consistent with the indexer
+#
+# NOTE: It is important that the resource has required values that the indexer #to_solr customizations expects to be available.
 RSpec.shared_examples 'a Hyrax::Resource indexer' do
-  subject(:indexer) { indexer_class.new(resource: resource) }
-  let(:ids)         { ['id1', 'id2'] }
-  let(:resource)    { Hyrax::Resource.new(alternate_ids: ids) }
+  before do
+    raise 'indexer_class must be set with `let(:indexer_class)`' unless defined? indexer_class
+    raise 'resource must be set with `let(:resource)` and is expected to be a kind of Hyrax::Resource' unless defined?(resource) && resource.kind_of?(Hyrax::Resource)
+    resource.alternate_ids = ids
+  end
+  subject(:indexer)  { indexer_class.new(resource: resource) }
+  let(:ids)          { ['id1', 'id2'] }
 
   describe '#to_solr' do
     it 'indexes alternate_ids' do
@@ -14,18 +24,21 @@ RSpec.shared_examples 'a Hyrax::Resource indexer' do
 end
 
 RSpec.shared_examples 'a permission indexer' do
+  before do
+    raise 'indexer_class must be set with `let(:indexer_class)`' unless defined? indexer_class
+    # NOTE: resource must be persisted for these tests to pass
+    raise 'resource must be set with `let(:resource)` and is expected to be a kind of Hyrax::Resource' unless defined?(resource) && resource.kind_of?(Hyrax::Resource)
+    Hyrax::VisibilityWriter.new(resource: resource)
+        .assign_access_for(visibility: Hydra::AccessControls::AccessRight::VISIBILITY_TEXT_VALUE_PUBLIC)
+    resource.permission_manager.edit_groups = edit_groups
+    resource.permission_manager.edit_users  = edit_users
+    resource.permission_manager.read_users  = read_users
+    resource.permission_manager.acl.save
+  end
   subject(:indexer) { indexer_class.new(resource: resource) }
   let(:edit_groups) { [:managers] }
   let(:edit_users)  { [FactoryBot.create(:user)] }
   let(:read_users)  { [FactoryBot.create(:user)] }
-
-  let(:resource) do
-    FactoryBot.valkyrie_create(:hyrax_work, :public,
-                               read_users: read_users,
-                               edit_groups: edit_groups,
-                               edit_users: edit_users)
-  end
-
 
   describe '#to_solr' do
     it 'indexes read permissions' do
@@ -43,16 +56,25 @@ RSpec.shared_examples 'a permission indexer' do
 end
 
 RSpec.shared_examples 'a visibility indexer' do
-  subject(:indexer) { indexer_class.new(resource: resource) }
-  let(:resource)    { FactoryBot.build(:hyrax_work) }
+  before do
+    raise 'indexer_class must be set with `let(:indexer_class)`' unless defined? indexer_class
+    raise 'resource must be set with `let(:resource)` and is expected to be a kind of Hyrax::Resource' unless defined?(resource) && resource.kind_of?(Hyrax::Resource)
+    # optionally can pass in default_visibility by setting it with a let statement if your application changes the default; Hyrax defines this as 'restricted'
+    # See samvera/hyrda-head hydra-access-controls/app/models/concerns/hydra/access_controls/access_rights.rb for possible VISIBILITY_TEXT_VALUE_...'
+  end
+  subject(:indexer)  { indexer_class.new(resource: resource) }
 
   describe '#to_solr' do
-    it 'indexes visibility' do
-      expect(indexer.to_solr).to include(visibility_ssi: 'restricted')
+    it 'indexes default visibility as restricted or passed in default' do
+      expected_value = defined?(default_visibility) ? default_visibility : 'restricted'
+      expect(indexer.to_solr).to include(visibility_ssi: expected_value)
     end
 
     context 'when resource is public' do
-      let(:resource) { FactoryBot.valkyrie_create(:hyrax_work, :public) }
+      before do
+        Hyrax::VisibilityWriter.new(resource: resource)
+          .assign_access_for(visibility: Hydra::AccessControls::AccessRight::VISIBILITY_TEXT_VALUE_PUBLIC)
+      end
 
       it 'indexes as open' do
         expect(indexer.to_solr).to include(visibility_ssi: 'open')
@@ -61,9 +83,37 @@ RSpec.shared_examples 'a visibility indexer' do
   end
 end
 
-RSpec.shared_examples 'a Basic metadata indexer' do
+RSpec.shared_examples 'a Core metadata indexer' do
+  before do
+    raise 'indexer_class must be set with `let(:indexer_class)`' unless defined? indexer_class
+    # NOTE: The resource's class is expected to have or inherit `include Hyrax::Schema(:core_metadata)`
+    raise 'resource must be set with `let(:resource)` and is expected to be a kind of Hyrax::Resource' unless defined?(resource) && resource.kind_of?(Hyrax::Resource)
+    resource.title = titles
+  end
   subject(:indexer) { indexer_class.new(resource: resource) }
-  let(:resource)    { resource_class.new(**attributes) }
+  let(:titles)      { ['Comet in Moominland', 'Finn Family Moomintroll'] }
+
+  describe '#to_solr' do
+    it 'indexes title as text' do
+      expect(indexer.to_solr)
+        .to include(title_tesim: a_collection_containing_exactly(*titles))
+    end
+
+    it 'indexes title as string' do
+      expect(indexer.to_solr)
+        .to include(title_sim: a_collection_containing_exactly(*titles))
+    end
+  end
+end
+
+RSpec.shared_examples 'a Basic metadata indexer' do
+  before do
+    raise 'indexer_class must be set with `let(:indexer_class)`' unless defined? indexer_class
+    # NOTE: The resource's class is expected to to have or inherit `include Hyrax::Schema(:basic_metadata)`
+    raise 'resource must be set with `let(:resource)` and is expected to be a kind of Hyrax::Resource' unless defined?(resource) && resource.kind_of?(Hyrax::Resource)
+    attributes.each { |k, v| resource.set_value(k, v) }
+  end
+  subject(:indexer) { indexer_class.new(resource: resource) }
 
   let(:attributes) do
     {
@@ -72,26 +122,42 @@ RSpec.shared_examples 'a Basic metadata indexer' do
     }
   end
 
-  let(:resource_class) do
-    Class.new(Hyrax::Work) do
-      include Hyrax::Schema(:basic_metadata)
-    end
-  end
-
   describe '#to_solr' do
     it 'indexes basic metadata' do
       expect(indexer.to_solr)
-        .to include(keyword_sim: a_collection_containing_exactly(*attributes[:keyword]),
+        .to include(keyword_sim:   a_collection_containing_exactly(*attributes[:keyword]),
                     subject_tesim: a_collection_containing_exactly(*attributes[:subject]),
                     subject_sim:   a_collection_containing_exactly(*attributes[:subject]))
     end
   end
 end
 
-RSpec.shared_examples 'a Collection indexer' do
+RSpec.shared_examples 'a Work indexer' do
+  before do
+    raise 'indexer_class must be set with `let(:indexer_class)`' unless defined? indexer_class
+    # NOTE: resource must be persisted for permission tests to pass
+    raise 'resource must be set with `let(:resource)` and is expected to be a kind of Hyrax::Work' unless defined?(resource) && resource.kind_of?(Hyrax::Work)
+    # optionally can pass in default_visibility by setting it with a let statement if your application changes the default; Hyrax defines this as 'restricted'
+    # See samvera/hyrda-head hydra-access-controls/app/models/concerns/hydra/access_controls/access_rights.rb for possible VISIBILITY_TEXT_VALUE_...'
+  end
   subject(:indexer) { indexer_class.new(resource: resource) }
-  let(:resource)    { Hyrax::PcdmCollection.new }
 
+  it_behaves_like 'a Hyrax::Resource indexer'
+  it_behaves_like 'a Core metadata indexer'
+  it_behaves_like 'a permission indexer'
+  it_behaves_like 'a visibility indexer'
+end
+
+RSpec.shared_examples 'a Collection indexer' do
+  before do
+    raise 'indexer_class must be set with `let(:indexer_class)`' unless defined? indexer_class
+    # NOTE: resource must be persisted for permission tests to pass
+    raise 'resource must be set with `let(:resource)` and is expected to be a kind of Hyrax::PcdmCollection' unless defined?(resource) && resource.kind_of?(Hyrax::PcdmCollection)
+  end
+  subject(:indexer) { indexer_class.new(resource: resource) }
+
+  it_behaves_like 'a Hyrax::Resource indexer'
+  it_behaves_like 'a Core metadata indexer'
   it_behaves_like 'a permission indexer'
   it_behaves_like 'a visibility indexer'
 
@@ -104,24 +170,6 @@ RSpec.shared_examples 'a Collection indexer' do
     it 'indexes thumbnail' do
       expect(indexer.to_solr)
         .to include(thumbnail_path_ss: include('assets/collection', '.png'))
-    end
-  end
-end
-
-RSpec.shared_examples 'a Core metadata indexer' do
-  subject(:indexer) { indexer_class.new(resource: resource) }
-  let(:titles)      { ['Comet in Moominland', 'Finn Family Moomintroll'] }
-  let(:resource)    { Hyrax::Work.new(title: titles) }
-
-  describe '#to_solr' do
-    it 'indexes title as text' do
-      expect(indexer.to_solr)
-        .to include(title_tesim: a_collection_containing_exactly(*titles))
-    end
-
-    it 'indexes title as string' do
-      expect(indexer.to_solr)
-        .to include(title_sim: a_collection_containing_exactly(*titles))
     end
   end
 end
