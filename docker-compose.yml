@@ -1,0 +1,94 @@
+version: '3.5'
+services:
+  app: &app
+    build:
+      context: .
+      target: hyrax-engine-dev
+    image: hyrax-engine-dev
+    stdin_open: true
+    tty: true
+    user: root
+    env_file:
+      - .env
+      - .dassie/.env
+    depends_on:
+      - db_migrate
+      - fcrepo
+      - memcached
+      - postgres
+      - redis
+      - solr
+    ports:
+      - 3000:3000
+    volumes:
+      - .dassie:/app/samvera/hyrax-webapp
+      - .:/app/samvera/hyrax-engine
+      - rails-public:/app/samvera/hyrax-webapp/public
+      - rails-tmp:/app/samvera/hyrax-webapp/tmp
+
+  db_migrate:
+    image: hyrax-engine-dev
+    user: root
+    env_file:
+      - .env
+    entrypoint: ["sh", "-c"]
+    command: db-migrate-seed.sh
+    depends_on:
+      - postgres
+    volumes:
+      - .dassie:/app/samvera/hyrax-webapp:cached
+      - .:/app/samvera/hyrax-engine:cached
+      - rails-public:/app/samvera/hyrax-webapp/public
+      - rails-tmp:/app/samvera/hyrax-webapp/tmp
+
+  postgres:
+    image: postgres:latest
+    restart: always
+    environment:
+      - POSTGRES_USER=hyrax_user
+      - POSTGRES_PASSWORD=hyrax_password
+      - POSTGRES_DB=hyrax
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
+
+  fcrepo:
+    image: cbeer/fcrepo4:4.7
+    volumes:
+      - fcrepo:/data
+    ports:
+      - 8080:8080
+    environment:
+      - JAVA_OPTS=${JAVA_OPTS} -Dfcrepo.modeshape.configuration="classpath:/config/file-simple/repository.json" -Dfcrepo.object.directory="/data/objects" -Dfcrepo.binary.directory="/data/binaries"
+
+  memcached:
+    image: bitnami/memcached
+    ports:
+      - '11211:11211'
+
+  redis:
+    image: redis:5-alpine
+    volumes:
+      - redis:/data
+
+  solr:
+    image: solr:7
+    ports:
+      - 8983:8983
+    command:
+      - solr-precreate
+      - hyrax
+      - /opt/solr/server/configsets/hyraxconf
+    volumes:
+      - solr_home:/opt/solr/server/solr
+      - .dassie/solr/conf:/opt/solr/server/configsets/hyraxconf
+
+volumes:
+  db:
+  fcrepo:
+  rails-public:
+  rails-tmp:
+  redis:
+  solr_home:
