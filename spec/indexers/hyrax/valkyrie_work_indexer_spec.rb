@@ -16,6 +16,12 @@ RSpec.describe Hyrax::ValkyrieWorkIndexer do
     end
     let(:resource) do
       Class.new(Hyrax::Work) do
+        # Included to address a `ArgumentError: Class name cannot be
+        # blank. You need to supply a name argument when anonymous
+        # class given`"
+        def self.model_name
+          ActiveModel::Name.new(self, nil, "TemporaryResource")
+        end
         include Hyrax::Schema(:basic_metadata)
       end.new
     end
