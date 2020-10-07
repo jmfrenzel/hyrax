@@ -105,7 +105,11 @@ module Hyrax
     # @see Blacklight::SearchState#initialize
     def link_to_field(name, value, label = nil, facet_hash = {})
       label ||= value
-      params = { search_field: name, q: "\"#{value}\"" } if name != ''
+      params = {}
+      if name.present?
+        params[:search_field] = name
+        params[:q] = "\"#{value}\""
+      end
       state = search_state_with_facets(params, facet_hash)
       link_to(label, main_app.search_catalog_path(state))
     end
@@ -302,7 +306,9 @@ module Hyrax
     # rubocop:enable Metrics/MethodLength
 
     # @param [ActionController::Parameters] params first argument for Blacklight::SearchState.new
-    # @param [Hash] facet
+    # @param [Hash] facet(s)
+    # @return [Hash]
+    #
     # @note Assumes one facet is passed in. If a second facet is passed, then it must be the depositor
     # facet used by the Profile page.
     def search_state_with_facets(params, facet = {})

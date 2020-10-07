@@ -26,8 +26,18 @@ RSpec.describe Hyrax::DashboardHelperBehavior, type: :helper do
       create_models("GenericWork", user1, user2)
     end
 
-    it "finds 3 works" do
-      expect(helper.number_of_works(user1)).to eq(3)
+    it "finds 2 works" do
+      expect(helper.number_of_works(user1)).to eq(2)
+    end
+
+    context "with an over-riddent :where clause" do
+      it "finds 3 works when passed an empty where" do
+        expect(helper.number_of_works(user1, where: {})).to eq(3)
+      end
+
+      it "limits to those matching the where clause" do
+        expect(helper.number_of_works(user1, where: { "generic_type_sim" => "Big Work" })).to eq(1)
+      end
     end
   end
 
@@ -61,10 +71,12 @@ RSpec.describe Hyrax::DashboardHelperBehavior, type: :helper do
     solr_service = Hyrax::SolrService
 
     # deposited by the first user
-    3.times do |t|
+    2.times do |t|
       solr_service.add id: "199#{t}", "depositor_tesim" => user1.user_key, "has_model_ssim" => [model],
-                       "depositor_ssim" => user1.user_key
+                       "depositor_ssim" => user1.user_key, "generic_type_sim" => "Work"
     end
+
+    solr_service.add id: "1993", "depositor_tesim" => user1.user_key, "generic_type_sim" => "Big Work", "has_model_ssim" => [model], "depositor_ssim" => user1.user_key
 
     # deposited by the second user, but editable by the first
     solr_service.add id: "1994", "depositor_tesim" => user2.user_key, "has_model_ssim" => [model],
