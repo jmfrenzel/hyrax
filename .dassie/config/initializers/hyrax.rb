@@ -1,7 +1,16 @@
 # frozen_string_literal: true
 Hyrax.config do |config|
+  # Hyrax can integrate with Zotero's Arkivo service for automatic deposit
+  # of Zotero-managed research items.
+  # Defaults to false.  See README for more info
+  config.arkivo_api = true
+
   # Injected via `rails g hyrax:work GenericWork`
   config.register_curation_concern :generic_work
+  # Injected via `rails g hyrax:work NamespacedWorks::NestedWork`
+  config.register_curation_concern :"namespaced_works/nested_work"
+  # Injected via `rails g hyrax:work_resource Monograph`
+  config.register_curation_concern :monograph
 
   config.iiif_image_server = true
 

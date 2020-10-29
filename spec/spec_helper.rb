@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+$VERBOSE = nil # silence loud Ruby 2.7 deprecations
 ENV['RAILS_ENV'] = 'test'
 ENV['DATABASE_URL'] = ENV['DATABASE_TEST_URL'] if ENV['DATABASE_TEST_URL']
 
@@ -29,6 +30,7 @@ if ENV['IN_DOCKER']
 
   ActiveRecord::Migrator.migrations_paths = [Pathname.new(ENV['RAILS_ROOT']).join('db', 'migrate').to_s]
   ActiveRecord::Tasks::DatabaseTasks.migrate
+  ActiveRecord::Base.descendants.each(&:reset_column_information)
 else
   require 'engine_cart'
   EngineCart.load_application!
@@ -221,6 +223,8 @@ RSpec.configure do |config|
 
   config.before(:each, type: :view) do
     initialize_controller_helpers(view)
+    # disallow network connections to services within the stack for view specs;
+    # no db/metadata/index calls
     WebMock.disable_net_connect!(allow_localhost: false, allow: 'chromedriver.storage.googleapis.com')
 
     allow(Hyrax)
@@ -229,7 +233,7 @@ RSpec.configure do |config|
   end
 
   config.after(:each, type: :view) do
-    WebMock.disable_net_connect!(allow_localhost: true, allow: 'chromedriver.storage.googleapis.com')
+    WebMock.disable_net_connect!(allow_localhost: true, allow: allowed_hosts)
   end
 
   config.before(:all, type: :feature) do
